@@ -1,0 +1,72 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    name: dynamic-gpu-mount-device-plugin
+  name: dynamic-gpu-mount-device-plugin
+spec:
+  selector:
+    matchLabels:
+      name: dynamic-gpu-mount-device-plugin
+  template:
+    metadata:
+      labels:
+        name: dynamic-gpu-mount-device-plugin
+    spec:
+      containers:
+      - args:
+        - device-plugin
+        - --conf=conf/dockerconfig.toml
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        image: "" # TODO 
+        imagePullPolicy: Always
+        name: dynamic-gpu-mount-device-plugin-node
+        # 使pod处于Qos为Guaranteed,驱逐优先级最低。并可以完整分得一块cpu，减少了很多cpu上下文切换
+        resources:
+          limits:
+            cpu: "1"
+          requests:
+            cpu: "1"
+        ports:
+        - containerPort: 1000
+          hostPort: 1000
+          name: http
+          protocol: TCP
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+          privileged: true
+          procMount: Default
+        volumeMounts:
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - mountPath: /var/lib/kubelet/device-plugins
+          name: device-plugin
+      dnsPolicy: ClusterFirst
+      hostPID: true
+      nodeSelector:
+        node/type: dynamic-gpu # 可更改
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+        name: cgroup
+      - hostPath:
+          path: /var/lib/kubelet/device-plugins
+          type: ""
+        name: device-plugin
+  templateGeneration: 6
+  updateStrategy:
+    type: OnDelete
